@@ -1,0 +1,53 @@
+1) transit data that consists of tramids and their related coordinates is used.
+2) Nested structure is created.
+
+  [[1]] ......................................................  [[490]]
+  
+  Lat  |  Long  |  Lat+Long
+  ---  |  ----  |  --------
+  
+  paste(, sep="+") is applied for gmapsdistance package in R.
+  gmapsdistance: It uses Google Distance API by driving or walking mode
+ 
+ 3) PROBLEM 1: The coordinates are not well ordered. It causes to us to receive unexpected distances as output. 
+ 
+ Location1      -50 meters-       Location2    -15 meters-       Location3        -20 meters-     Location4
+ L1                               L2                             L3                               L4       
+ 
+ Let's assume that we must reach 95 meters as the driving distance (shortest distance since the sections are almost straight). However,
+ our nested table can be as follows:
+ 
+ Lat | Long 
+ L1
+ L4
+ L2
+ L3
+ 
+ Then:
+ distance(L1, L4) = 95
+ distance(L4, L2) = 35
+ distance(L2, L3) = 15
++
+------------------------
+145 meters --> WRONG!
+
+3.1 ) In order to reduce the number of runs with Google Distance API, the frames (tramids) that consist of only 2 rows (coordinates)
+are stored separately. The rest of the data became the target one.
+
+3.2 ) With the frames with more than 2 rows, we create distance matrix (mode="all").
+
+    | 1 | 2 | 3 | 4 |                       row number: 4
+---------------------                       In a for loop:
+ 1  | X |   |   |   |                                       
+ --------------------                               for(i in seq(1, rownumber-1)){
+ 2  |   | X |   |   |                                                       ... Check each columns' min value and store it
+ --------------------                                                       ... Sum the min values
+ 3  |   |   | X |   |                                                       }
+ --------------------                       This for loop is repeated for each tramid. 
+ 4  |   |   |   | X |
+ 
+ 4) PROBLEM 2: Sometimes even if the location pairs are so close, we receive really high values for the distance, that is unexpected. 
+ It is because of the "driving" mode. In this case, we use "walking" mode to extract the distance in meters.
+ 
+ 5) PROBLEM 3: Sometimes both in" driving" and "walking" mode, we receive NA. It is because of the missing information in Google Maps.
+ In this case, we check the distance from other maps manually.
