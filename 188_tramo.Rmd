@@ -1,0 +1,161 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+options(digits = 15)
+whole_data <- rbind(january, february, march, april, may, june)
+write.csv(whole_data, "datasets_open/whole_data.csv")
+
+```
+
+```{r}
+head(transit_data)
+```
+
+```{r}
+summary(whole_data$tempsActual)
+```
+
+```{r}
+summary(whole_data$tempsPrevist)
+```
+
+```{r}
+unique_tramids<-length(unique(transit_data$Tram))
+which(table(transit_data$Tram)==2)
+```
+
+TramID 188 has 2 different polylines and different coordinates. We might need to discard one of them, or rename it, or rename all the tramIDs.
+
+```{r}
+which(transit_data$Tram==188)
+transit_data[188:189,]
+
+```
+```{r}
+a<-c(41.38970316422083, 41.39415437342539)
+b<-c(2.173418906968181, 2.167510879408985)
+coordinate_df <- data.frame(lat = a,
+                            long = b)
+library(leaflet)
+library(magrittr)
+
+leaflet()%>%
+  addTiles() %>%
+  addPolylines(data = coordinate_df, lng = ~long, lat = ~lat)
+
+
+```
+
+```{r}
+a1<-c(41.39415995798503,41.39731781385859)
+b1<-c(2.167479116678159,2.163328963140889)
+coordinate_df1 <- data.frame(lat = a1,
+                            long = b1)
+coordinate_df1 <- correct_version[[82]][,c(1,2)]
+leaflet()%>%
+  addTiles() %>%
+  addPolylines(data = coordinate_df1, lng = ~Long, lat = ~Lat)
+```
+
+
+TramID 530 does not have coordinates.
+
+```{r}
+transit_data<-transit_data[-487,]
+```
+
+
+
+
+# CALCULATING DISTANCE
+
+Calculation and storage of the distance data. 
+
+Function:
+```{r}
+library(XML)
+library(bitops)
+library(RCurl)
+latlon2ft <- function(origin,destination){
+  xml.url <- paste0('http://maps.googleapis.com/maps/api/distancematrix/xml?origins=',origin,'&destinations=',destination,'&mode=driving&sensor=false')
+  xmlfile <- xmlParse(getURL(xml.url))
+  dist <- xmlValue(xmlChildren(xpathApply(xmlfile,"//distance")[[1]])$value)
+  distance <- as.numeric(sub(" km","",dist))
+  return(distance)
+  }
+```
+
+Converting the data into correct format:
+```{r}
+correct_version<-NULL
+for(i in seq(1, 490)){
+  dat1 <- t(data.frame(do.call(rbind, strsplit(transit_data$Coordenades[i], split = " "))))
+  dat2 <- data.frame(do.call(rbind, strsplit(dat1, split = ",")))
+  colnames(dat2) <- c("Long", "Lat")
+  dat2 <- dat2[,c(2,1)]
+  dat2$combined2<-paste(dat2$Lat, dat2$Long, sep=",")
+  correct_version[[i]]<-dat2
+  }
+```
+
+Distance Calculation:
+```{r}
+whole_list_dist<-NULL
+# whole_list_time<-NULL
+
+for(i in seq(1,490)){  
+  length_list <- dim(correct_version[[i]])[1]
+  list_dist<-NULL
+  list_time<-NULL
+  
+  if(length_list==2)
+  {
+    sum_whole<-gmapsdistance(origin = correct_version[[i]]$combined2[1], destination = correct_version[[i]]$combined2[2], mode = "walking")
+    whole_list_dist[i]<-sum_whole$Distance
+    # whole_list_time[i]<-sum_whole$Time
+  }else
+  {
+    for(j in seq(1, length_list-1)){
+      sum_whole<-gmapsdistance(origin = correct_version[[i]]$combined2[j], destination = correct_version[[i]]$combined2[j+1], mode = "walking")
+      list_dist[j]<-sum_whole$Distance
+      # list_time[j]<-sum_whole$Time
+      
+    }
+    whole_list_dist[i]<-sum(list_dist)
+    # whole_list_time[i]<-sum(list_time)
+  }
+  
+}
+```
+
+The distances calculated using walking mode to extract the distance in meters. 
+
+```{r}
+which(is.na(whole_list_dist))
+```
+
+Some of the values are not computed, and reported as "NA". We will investigate this values and their corresponding coordinates. Row 48, 53, 278, 279, 346, 347, 485, 486 and 488 is reported as "NA".
+
+Row 48:
+```{r}
+correct_version[[48]]
+```
+
+The total distance between arbitrary pairs is 328 meters. It is calculated outside of the code. 
+
+```{r}
+correct_version[[53]]
+```
+
+The total distance between arbitrary pairs is 1222 meters. It is calculated outside of the code. 
+
+```{r}
+correct_version[[278]]
+```
+
+
+The total distance between arbitrary pairs is 1342 meters. It is calculated outside of the code. 
